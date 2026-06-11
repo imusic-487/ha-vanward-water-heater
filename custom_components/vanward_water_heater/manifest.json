@@ -1,10 +1,13 @@
 {
   "domain": "vanward_water_heater",
   "name": "Vanward Water Heater",
-  "codeowners": [],
+  "codeowners": [
+    "@orangeboyChen"
+  ],
   "config_flow": true,
-  "documentation": "https://github.com/orangeboy/ha-vanward-water-heater",
+  "documentation": "https://github.com/orangeboyChen/ha-vanward-water-heater",
   "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/orangeboyChen/ha-vanward-water-heater/issues",
   "requirements": [],
   "version": "0.1.0"
 }
