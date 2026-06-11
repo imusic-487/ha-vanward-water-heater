@@ -13,7 +13,7 @@ from homeassistant.const import ATTR_TEMPERATURE, STATE_OFF, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import BATHROOM_MODE_OPTIONS, DOMAIN
+from .const import BATHROOM_MODE_OPTIONS
 from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 
@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
+    coordinators = entry.runtime_data.coordinators.values()
     entities = [VanwardWaterHeater(coordinator) for coordinator in coordinators]
     _LOGGER.debug("Adding %s Vanward water heater entities", len(entities))
     async_add_entities(entities)

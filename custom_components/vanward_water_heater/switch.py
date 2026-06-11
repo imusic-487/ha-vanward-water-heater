@@ -6,12 +6,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import logging
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
 from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
@@ -19,45 +18,36 @@ from .protocol import VanwardDeviceState
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, slots=True)
-class VanwardSwitchDescription:
-    key: str
-    translation_key: str
+@dataclass(frozen=True, kw_only=True)
+class VanwardSwitchDescription(SwitchEntityDescription):
+    """Description for Vanward switch entities."""
+
     value_fn: Callable[[VanwardDeviceState], bool]
     set_fn: Callable[[VanwardCoordinator, bool], Awaitable[None]]
-    translation_placeholders: dict[str, str] | None = None
 
 
 SWITCHES = [
     VanwardSwitchDescription(
-        "power",
-        "power",
-        lambda state: state.power,
-        lambda coordinator, enabled: coordinator.client.async_set_power(
+        key="boost",
+        translation_key="boost",
+        value_fn=lambda state: state.boost,
+        set_fn=lambda coordinator, enabled: coordinator.client.async_set_boost(
             coordinator.device_id, enabled
         ),
     ),
     VanwardSwitchDescription(
-        "boost",
-        "boost",
-        lambda state: state.boost,
-        lambda coordinator, enabled: coordinator.client.async_set_boost(
+        key="single_cruise",
+        translation_key="single_cruise",
+        value_fn=lambda state: state.single_cruise,
+        set_fn=lambda coordinator, enabled: coordinator.client.async_set_single_cruise(
             coordinator.device_id, enabled
         ),
     ),
     VanwardSwitchDescription(
-        "single_cruise",
-        "single_cruise",
-        lambda state: state.single_cruise,
-        lambda coordinator, enabled: coordinator.client.async_set_single_cruise(
-            coordinator.device_id, enabled
-        ),
-    ),
-    VanwardSwitchDescription(
-        "enjoy_cruise",
-        "enjoy_cruise",
-        lambda state: state.enjoy_cruise,
-        lambda coordinator, enabled: coordinator.client.async_set_enjoy_cruise(
+        key="enjoy_cruise",
+        translation_key="enjoy_cruise",
+        value_fn=lambda state: state.enjoy_cruise,
+        set_fn=lambda coordinator, enabled: coordinator.client.async_set_enjoy_cruise(
             coordinator.device_id, enabled
         ),
     ),
@@ -67,7 +57,7 @@ SWITCHES = [
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
+    coordinators = entry.runtime_data.coordinators.values()
     entities = [
         VanwardSwitch(coordinator, description)
         for coordinator in coordinators

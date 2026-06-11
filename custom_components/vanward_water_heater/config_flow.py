@@ -193,6 +193,9 @@ class VanwardConfigFlow(ConfigFlow, domain=DOMAIN):
         assert self._password is not None
 
         await self._async_login()
+        await self.async_set_unique_id(self._mobile)
+        if self._existing_entry is None:
+            self._abort_if_unique_id_configured()
         return await self.async_step_devices()
 
     async def _async_login(self) -> None:

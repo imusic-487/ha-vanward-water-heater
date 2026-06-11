@@ -39,17 +39,14 @@
   },
   "entity": {
     "switch": {
-      "power": { "name": "热水器开关" },
       "boost": { "name": "水增压开关" },
       "single_cruise": { "name": "单次巡航" },
       "enjoy_cruise": { "name": "E享巡航" }
     },
     "select": {
-      "cruise_mode": { "name": "巡航模式" },
-      "bathroom_mode": { "name": "卫浴模式" }
+      "cruise_mode": { "name": "巡航模式" }
     },
     "number": {
-      "target_temperature": { "name": "热水器温度" },
       "cruise_temperature": { "name": "巡航温度" }
     },
     "sensor": {

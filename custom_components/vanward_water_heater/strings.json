@@ -39,17 +39,14 @@
   },
   "entity": {
     "switch": {
-      "power": { "name": "Power" },
       "boost": { "name": "Water Boost" },
       "single_cruise": { "name": "Single Cruise" },
       "enjoy_cruise": { "name": "E Enjoy Cruise" }
     },
     "select": {
-      "cruise_mode": { "name": "Cruise Mode" },
-      "bathroom_mode": { "name": "Bathroom Mode" }
+      "cruise_mode": { "name": "Cruise Mode" }
     },
     "number": {
-      "target_temperature": { "name": "Target Temperature" },
       "cruise_temperature": { "name": "Cruise Temperature" }
     },
     "sensor": {

@@ -9,6 +9,7 @@ import logging
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -16,7 +17,6 @@ from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
 from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
@@ -24,49 +24,43 @@ from .protocol import VanwardDeviceState
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, slots=True)
-class VanwardSensorDescription:
-    key: str
-    translation_key: str
-    device_class: SensorDeviceClass | None
-    state_class: SensorStateClass
-    unit: str
+@dataclass(frozen=True, kw_only=True)
+class VanwardSensorDescription(SensorEntityDescription):
+    """Description for Vanward sensor entities."""
+
     value_fn: Callable[[VanwardDeviceState], float | None]
-    translation_placeholders: dict[str, str] | None = None
 
 
 SENSORS = [
     VanwardSensorDescription(
-        "current_water_usage",
-        "current_water_usage",
-        None,
-        SensorStateClass.MEASUREMENT,
-        UnitOfVolume.LITERS,
-        lambda state: state.current_water_usage,
+        key="current_water_usage",
+        translation_key="current_water_usage",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
+        value_fn=lambda state: state.current_water_usage,
     ),
     VanwardSensorDescription(
-        "current_gas_usage",
-        "current_gas_usage",
-        None,
-        SensorStateClass.MEASUREMENT,
-        UnitOfVolume.CUBIC_METERS,
-        lambda state: state.current_gas_usage,
+        key="current_gas_usage",
+        translation_key="current_gas_usage",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        value_fn=lambda state: state.current_gas_usage,
     ),
     VanwardSensorDescription(
-        "total_water_usage",
-        "total_water_usage",
-        SensorDeviceClass.WATER,
-        SensorStateClass.TOTAL,
-        UnitOfVolume.LITERS,
-        lambda state: state.total_water_usage,
+        key="total_water_usage",
+        translation_key="total_water_usage",
+        device_class=SensorDeviceClass.WATER,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
+        value_fn=lambda state: state.total_water_usage,
     ),
     VanwardSensorDescription(
-        "total_gas_usage",
-        "total_gas_usage",
-        SensorDeviceClass.GAS,
-        SensorStateClass.TOTAL,
-        UnitOfVolume.CUBIC_METERS,
-        lambda state: state.total_gas_usage,
+        key="total_gas_usage",
+        translation_key="total_gas_usage",
+        device_class=SensorDeviceClass.GAS,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        value_fn=lambda state: state.total_gas_usage,
     ),
 ]
 
@@ -74,7 +68,7 @@ SENSORS = [
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
+    coordinators = entry.runtime_data.coordinators.values()
     entities = [
         VanwardSensor(coordinator, description)
         for coordinator in coordinators
@@ -94,9 +88,6 @@ class VanwardSensor(VanwardEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator, description.key, description.translation_key)
         self.entity_description = description
-        self._attr_device_class = description.device_class
-        self._attr_native_unit_of_measurement = description.unit
-        self._attr_state_class = description.state_class
 
     @property
     def native_value(self) -> float | None:

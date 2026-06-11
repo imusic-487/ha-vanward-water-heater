@@ -6,12 +6,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import logging
 
-from homeassistant.components.select import SelectEntity
+from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import BATHROOM_MODE_OPTIONS, CRUISE_OPTIONS, DOMAIN
+from .const import CRUISE_OPTIONS
 from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
@@ -19,32 +19,22 @@ from .protocol import VanwardDeviceState
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, slots=True)
-class VanwardSelectDescription:
-    key: str
-    translation_key: str
+@dataclass(frozen=True, kw_only=True)
+class VanwardSelectDescription(SelectEntityDescription):
+    """Description for Vanward select entities."""
+
     options: list[str]
     value_fn: Callable[[VanwardDeviceState], str | None]
     set_fn: Callable[[VanwardCoordinator, str], Awaitable[None]]
-    translation_placeholders: dict[str, str] | None = None
 
 
 SELECTS = [
     VanwardSelectDescription(
-        "cruise_mode",
-        "cruise_mode",
-        CRUISE_OPTIONS,
-        lambda state: state.cruise_mode,
-        lambda coordinator, option: coordinator.client.async_set_cruise_mode(
-            coordinator.device_id, option
-        ),
-    ),
-    VanwardSelectDescription(
-        "bathroom_mode",
-        "bathroom_mode",
-        BATHROOM_MODE_OPTIONS,
-        lambda state: state.bathroom_mode,
-        lambda coordinator, option: coordinator.client.async_set_bathroom_mode(
+        key="cruise_mode",
+        translation_key="cruise_mode",
+        options=CRUISE_OPTIONS,
+        value_fn=lambda state: state.cruise_mode,
+        set_fn=lambda coordinator, option: coordinator.client.async_set_cruise_mode(
             coordinator.device_id, option
         ),
     ),
@@ -54,7 +44,7 @@ SELECTS = [
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
+    coordinators = entry.runtime_data.coordinators.values()
     entities = [
         VanwardSelect(coordinator, description)
         for coordinator in coordinators

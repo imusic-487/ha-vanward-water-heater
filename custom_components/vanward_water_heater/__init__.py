@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -11,13 +12,24 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VanwardApiClient, VanwardAuthError
-from .const import CONF_DEVICE_IDS, CONF_MOBILE, DOMAIN, PLATFORMS
+from .const import CONF_DEVICE_IDS, CONF_MOBILE, PLATFORMS
 from .coordinator import VanwardCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+@dataclass
+class VanwardData:
+    """Runtime data for the Vanward water heater integration."""
+
+    client: VanwardApiClient
+    coordinators: dict[str, VanwardCoordinator]
+
+
+type VanwardConfigEntry = ConfigEntry[VanwardData]
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: VanwardConfigEntry) -> bool:
     """Set up from a config entry."""
 
     session = async_get_clientsession(hass)
@@ -61,32 +73,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     client.set_state_callback(_state_updated)
     client.set_auth_failed_callback(_auth_failed)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        "client": client,
-        "coordinators": coordinators,
-    }
     try:
         await client.async_connect()
     except VanwardAuthError as err:
         await client.async_disconnect()
-        hass.data[DOMAIN].pop(entry.entry_id, None)
         raise ConfigEntryAuthFailed from err
     except Exception as err:
         await client.async_disconnect()
-        hass.data[DOMAIN].pop(entry.entry_id, None)
         raise ConfigEntryNotReady from err
 
+    entry.runtime_data = VanwardData(client=client, coordinators=coordinators)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: VanwardConfigEntry) -> bool:
     """Unload a config entry."""
 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    data = hass.data[DOMAIN].pop(entry.entry_id)
-    await data["client"].async_disconnect()
+    await entry.runtime_data.client.async_disconnect()
     return unload_ok
 
 

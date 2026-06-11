@@ -6,12 +6,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 import logging
 
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
 from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
@@ -19,34 +22,41 @@ from .protocol import VanwardDeviceState
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, slots=True)
-class VanwardBinarySensorDescription:
-    key: str
-    translation_key: str
+@dataclass(frozen=True, kw_only=True)
+class VanwardBinarySensorDescription(BinarySensorEntityDescription):
+    """Description for Vanward binary sensor entities."""
+
     value_fn: Callable[[VanwardDeviceState], bool]
-    translation_placeholders: dict[str, str] | None = None
 
 
 BINARY_SENSORS = [
     VanwardBinarySensorDescription(
-        "heating",
-        "heating",
-        lambda state: state.heating,
+        key="heating",
+        translation_key="heating",
+        icon="mdi:fire",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        value_fn=lambda state: state.heating,
     ),
     VanwardBinarySensorDescription(
-        "water_flowing",
-        "water_flowing",
-        lambda state: state.water_flowing,
+        key="water_flowing",
+        translation_key="water_flowing",
+        icon="mdi:water-pump",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        value_fn=lambda state: state.water_flowing,
     ),
     VanwardBinarySensorDescription(
-        "fan",
-        "fan",
-        lambda state: state.fan,
+        key="fan",
+        translation_key="fan",
+        icon="mdi:fan",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        value_fn=lambda state: state.fan,
     ),
     VanwardBinarySensorDescription(
-        "antifreeze",
-        "antifreeze",
-        lambda state: state.antifreeze,
+        key="antifreeze",
+        translation_key="antifreeze",
+        icon="mdi:snowflake",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        value_fn=lambda state: state.antifreeze,
     ),
 ]
 
@@ -54,7 +64,7 @@ BINARY_SENSORS = [
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
+    coordinators = entry.runtime_data.coordinators.values()
     entities = [
         VanwardBinarySensor(coordinator, description)
         for coordinator in coordinators
@@ -66,8 +76,6 @@ async def async_setup_entry(
 
 class VanwardBinarySensor(VanwardEntity, BinarySensorEntity):
     """Binary sensor entity."""
-
-    _attr_device_class = BinarySensorDeviceClass.RUNNING
 
     def __init__(
         self,

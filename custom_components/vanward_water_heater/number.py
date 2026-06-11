@@ -6,13 +6,16 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import logging
 
-from homeassistant.components.number import NumberDeviceClass, NumberEntity
+from homeassistant.components.number import (
+    NumberDeviceClass,
+    NumberEntity,
+    NumberEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
 from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
@@ -20,35 +23,25 @@ from .protocol import VanwardDeviceState
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, slots=True)
-class VanwardNumberDescription:
-    key: str
-    translation_key: str
-    minimum: int
-    maximum: int
+@dataclass(frozen=True, kw_only=True)
+class VanwardNumberDescription(NumberEntityDescription):
+    """Description for Vanward number entities."""
+
     value_fn: Callable[[VanwardDeviceState], int]
     set_fn: Callable[[VanwardCoordinator, int], Awaitable[None]]
-    translation_placeholders: dict[str, str] | None = None
 
 
 NUMBERS = [
     VanwardNumberDescription(
-        "target_temperature",
-        "target_temperature",
-        30,
-        65,
-        lambda state: state.target_temperature,
-        lambda coordinator, value: coordinator.client.async_set_target_temperature(
-            coordinator.device_id, value
-        ),
-    ),
-    VanwardNumberDescription(
-        "cruise_temperature",
-        "cruise_temperature",
-        34,
-        43,
-        lambda state: state.cruise_temperature,
-        lambda coordinator, value: coordinator.client.async_set_cruise_temperature(
+        key="cruise_temperature",
+        translation_key="cruise_temperature",
+        device_class=NumberDeviceClass.TEMPERATURE,
+        native_min_value=34,
+        native_max_value=43,
+        native_step=1,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        value_fn=lambda state: state.cruise_temperature,
+        set_fn=lambda coordinator, value: coordinator.client.async_set_cruise_temperature(
             coordinator.device_id, value
         ),
     ),
@@ -58,7 +51,7 @@ NUMBERS = [
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
+    coordinators = entry.runtime_data.coordinators.values()
     entities = [
         VanwardNumber(coordinator, description)
         for coordinator in coordinators
@@ -71,10 +64,6 @@ async def async_setup_entry(
 class VanwardNumber(VanwardEntity, NumberEntity):
     """Number entity."""
 
-    _attr_device_class = NumberDeviceClass.TEMPERATURE
-    _attr_native_step = 1
-    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
-
     def __init__(
         self,
         coordinator: VanwardCoordinator,
@@ -82,8 +71,6 @@ class VanwardNumber(VanwardEntity, NumberEntity):
     ) -> None:
         super().__init__(coordinator, description.key, description.translation_key)
         self.entity_description = description
-        self._attr_native_min_value = description.minimum
-        self._attr_native_max_value = description.maximum
 
     @property
     def native_value(self) -> int:
