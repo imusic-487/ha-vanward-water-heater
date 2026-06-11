@@ -23,7 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         password=entry.data[CONF_PASSWORD],
     )
     try:
-        await client.async_login()
+        await client.async_fetch_devices()
     except VanwardAuthError as err:
         raise ConfigEntryAuthFailed from err
     except Exception as err:

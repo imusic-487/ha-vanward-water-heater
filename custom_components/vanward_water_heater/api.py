@@ -70,6 +70,9 @@ class VanwardApiClient:
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._listen_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
+        self._login_response_future: asyncio.Future[
+            dict[str, VanwardDeviceState]
+        ] | None = None
         self._state_callback: StateCallback | None = None
         self._auth_failed_callback: AuthFailedCallback | None = None
         self.auth_failed = False
@@ -85,8 +88,8 @@ class VanwardApiClient:
     def set_auth_failed_callback(self, callback: AuthFailedCallback) -> None:
         self._auth_failed_callback = callback
 
-    async def async_login(self) -> dict[str, VanwardDeviceState]:
-        """Login via HTTP and cache token plus initial device states."""
+    async def async_login(self) -> None:
+        """Login via HTTP and cache token."""
 
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -108,18 +111,24 @@ class VanwardApiClient:
         self._token = user["Token"]
         self._user_id = user["Uuid"]
         self.auth_failed = False
-        self.states = states_from_login_payload(payload)
-        for device_id, state in self.states.items():
-            self._notify_state(device_id, state)
-        return self.states
 
     async def async_relogin(self) -> dict[str, VanwardDeviceState]:
         """Refresh HTTP token and reconnect WebSocket."""
 
         await self.async_disconnect()
-        states = await self.async_login()
+        await self.async_login()
         await self.async_connect()
-        return states
+        return self.states
+
+    async def async_fetch_devices(self) -> dict[str, VanwardDeviceState]:
+        """Login and wait for devices from the WebSocket login response."""
+
+        await self.async_login()
+        await self.async_connect()
+        try:
+            return await asyncio.wait_for(self._wait_for_login_response(), timeout=20)
+        finally:
+            await self.async_disconnect()
 
     async def async_refresh_session(self) -> None:
         """Refresh token and re-login on the current WebSocket."""
@@ -155,6 +164,7 @@ class VanwardApiClient:
                     await task
         self._listen_task = None
         self._heartbeat_task = None
+        self._login_response_future = None
         if self._ws is not None and not self._ws.closed:
             await self._ws.close()
         self._ws = None
@@ -215,7 +225,7 @@ class VanwardApiClient:
         self, device_id: str, mutator: Callable[[VanwardDeviceState], bool]
     ) -> None:
         if not self.states:
-            await self.async_login()
+            await self.async_fetch_devices()
         state = self.states[device_id]
 
         changed = mutator(state)
@@ -283,6 +293,11 @@ class VanwardApiClient:
             self.states = states_from_login_payload(payload)
             for device_id, state in self.states.items():
                 self._notify_state(device_id, state)
+            if (
+                self._login_response_future is not None
+                and not self._login_response_future.done()
+            ):
+                self._login_response_future.set_result(self.states)
         elif command == COMMAND_STATUS_REPORT and self.states:
             status = payload.get("data", {}).get("Status") or payload.get("Status")
             device_id = (
@@ -306,6 +321,12 @@ class VanwardApiClient:
     def _notify_state(self, device_id: str, state: VanwardDeviceState) -> None:
         if self._state_callback is not None:
             self._state_callback(device_id, state)
+
+    async def _wait_for_login_response(self) -> dict[str, VanwardDeviceState]:
+        if self.states:
+            return self.states
+        self._login_response_future = asyncio.get_running_loop().create_future()
+        return await self._login_response_future
 
 
 def _payload_indicates_auth_error(payload: dict[str, Any]) -> bool:

@@ -202,7 +202,7 @@ class VanwardConfigFlow(ConfigFlow, domain=DOMAIN):
             mobile=self._mobile,
             password=self._password,
         )
-        self._states = await client.async_login()
+        self._states = await client.async_fetch_devices()
 
     def _available_states(self) -> dict[str, VanwardDeviceState]:
         configured = self._configured_device_ids()
