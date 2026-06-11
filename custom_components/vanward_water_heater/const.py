@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from homeassistant.const import Platform
+
 DOMAIN = "vanward_water_heater"
 
 CONF_MOBILE = "mobile"
@@ -17,13 +19,13 @@ COMMAND_STATUS_REPORT = 0x22
 COMMAND_HEARTBEAT_RESPONSE = 0x23
 
 PLATFORMS = [
-    "binary_sensor",
-    "button",
-    "number",
-    "select",
-    "sensor",
-    "switch",
-    "water_heater",
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.WATER_HEATER,
 ]
 
 CRUISE_OPTIONS = ["关闭", "全天候", "点动", "预约", "自学习"]

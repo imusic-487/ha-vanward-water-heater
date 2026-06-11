@@ -50,6 +50,10 @@ class VanwardWaterHeater(VanwardEntity, WaterHeaterEntity):
         return state.bathroom_mode
 
     @property
+    def current_temperature(self) -> int:
+        return self.coordinator.data.current_temperature
+
+    @property
     def target_temperature(self) -> int:
         return self.coordinator.data.target_temperature
 

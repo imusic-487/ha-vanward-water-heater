@@ -43,6 +43,10 @@ class VanwardDeviceState:
         return value[0] if value else None
 
     @property
+    def current_temperature(self) -> int:
+        return self.raw_status[6]
+
+    @property
     def target_temperature(self) -> int:
         return self.operational_status[2]
 
