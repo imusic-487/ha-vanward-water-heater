@@ -12,7 +12,7 @@ from homeassistant.const import CONF_PASSWORD
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 
-from .api import VanwardApiClient, VanwardAuthError
+from .api import VanwardApiClient, VanwardAuthError, VanwardNoDevicesError
 from .const import CONF_DEVICE_IDS, CONF_MOBILE, DOMAIN
 from .protocol import VanwardDeviceState
 
@@ -41,7 +41,13 @@ class VanwardConfigFlow(ConfigFlow, domain=DOMAIN):
             self._password = existing.data[CONF_PASSWORD]
             try:
                 return await self._async_login_and_show_devices()
-            except (VanwardAuthError, aiohttp.ClientError, TimeoutError, ValueError):
+            except (
+                VanwardAuthError,
+                VanwardNoDevicesError,
+                aiohttp.ClientError,
+                TimeoutError,
+                ValueError,
+            ):
                 self._mobile = None
                 self._password = None
                 return await self.async_step_account()
@@ -63,7 +69,7 @@ class VanwardConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except (aiohttp.ClientError, TimeoutError):
                 errors["base"] = "cannot_connect"
-            except ValueError:
+            except VanwardNoDevicesError:
                 errors["base"] = "no_device"
 
         return self.async_show_form(
@@ -100,7 +106,7 @@ class VanwardConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except (aiohttp.ClientError, TimeoutError):
                 errors["base"] = "cannot_connect"
-            except ValueError:
+            except VanwardNoDevicesError:
                 errors["base"] = "no_device"
             else:
                 assert self._reauth_entry is not None

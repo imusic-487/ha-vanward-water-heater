@@ -161,8 +161,6 @@ def states_from_login_payload(payload: dict[str, Any]) -> dict[str, VanwardDevic
             name=device.get("Name") or product.get("Name"),
         )
         states[device_id] = state_from_status(status, info)
-    if not states:
-        raise ValueError("No devices returned by the Vanward account")
     return states
 
 

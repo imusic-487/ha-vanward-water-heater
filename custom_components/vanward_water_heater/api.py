@@ -45,6 +45,10 @@ class VanwardApiError(Exception):
     """Base API error."""
 
 
+class VanwardNoDevicesError(VanwardApiError):
+    """No devices were returned by the Vanward account."""
+
+
 class VanwardAuthError(VanwardApiError):
     """Authentication failed."""
 
@@ -127,6 +131,10 @@ class VanwardApiClient:
         await self.async_connect()
         try:
             return await asyncio.wait_for(self._wait_for_login_response(), timeout=20)
+        except TimeoutError as err:
+            raise VanwardNoDevicesError(
+                "No devices returned by the Vanward account"
+            ) from err
         finally:
             await self.async_disconnect()
 
@@ -290,7 +298,11 @@ class VanwardApiClient:
         if _payload_indicates_auth_error(payload):
             raise VanwardSessionExpired("Vanward session expired")
         if command == COMMAND_LOGIN:
-            self.states = states_from_login_payload(payload)
+            states = states_from_login_payload(payload)
+            if not states:
+                _LOGGER.debug("Ignoring Vanward login response without devices")
+                return
+            self.states = states
             for device_id, state in self.states.items():
                 self._notify_state(device_id, state)
             if (
