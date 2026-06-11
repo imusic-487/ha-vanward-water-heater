@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Callable
 from contextlib import suppress
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -19,6 +20,7 @@ from .const import (
 )
 from .protocol import (
     VanwardDeviceState,
+    clone_state,
     decode_message,
     encode_message,
     press_call,
@@ -39,6 +41,8 @@ _LOGGER = logging.getLogger(__name__)
 
 StateCallback = Callable[[str, VanwardDeviceState], None]
 AuthFailedCallback = Callable[[], None]
+PENDING_CONFIRM_TIMEOUT = 8
+PendingStatus = tuple[dict[int, int], float]
 
 
 class VanwardApiError(Exception):
@@ -74,13 +78,17 @@ class VanwardApiClient:
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._listen_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
+        self._reconnect_task: asyncio.Task[None] | None = None
+        self._state_refresh_task: asyncio.Task[None] | None = None
         self._login_response_future: asyncio.Future[
             dict[str, VanwardDeviceState]
         ] | None = None
         self._state_callback: StateCallback | None = None
         self._auth_failed_callback: AuthFailedCallback | None = None
+        self._send_lock = asyncio.Lock()
         self.auth_failed = False
         self.states: dict[str, VanwardDeviceState] = {}
+        self._pending_status: dict[str, PendingStatus] = {}
 
     @property
     def connected(self) -> bool:
@@ -159,19 +167,30 @@ class VanwardApiClient:
         await self._ws.send_bytes(
             encode_message(COMMAND_LOGIN, {"Id": self._user_id, "Token": self._token})
         )
+        _LOGGER.info("Sent Vanward WebSocket login")
         self._listen_task = asyncio.create_task(self._listen_loop())
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
     async def async_disconnect(self) -> None:
         """Close the WebSocket and background tasks."""
 
-        for task in (self._listen_task, self._heartbeat_task):
+        current_task = asyncio.current_task()
+        for task in (
+            self._listen_task,
+            self._heartbeat_task,
+            self._reconnect_task,
+            self._state_refresh_task,
+        ):
             if task is not None:
+                if task is current_task:
+                    continue
                 task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
         self._listen_task = None
         self._heartbeat_task = None
+        self._reconnect_task = None
+        self._state_refresh_task = None
         self._login_response_future = None
         if self._ws is not None and not self._ws.closed:
             await self._ws.close()
@@ -223,35 +242,68 @@ class VanwardApiClient:
 
     async def async_set_bathroom_mode(self, device_id: str, option: str) -> None:
         await self._mutate_and_send(
-            device_id, lambda state: set_bathroom_mode(state, option)
+            device_id,
+            lambda state: set_bathroom_mode(state, option),
+            refresh_after_send=True,
         )
 
     async def async_press_call(self, device_id: str) -> None:
         await self._mutate_and_send(device_id, press_call)
 
     async def _mutate_and_send(
-        self, device_id: str, mutator: Callable[[VanwardDeviceState], bool]
+        self,
+        device_id: str,
+        mutator: Callable[[VanwardDeviceState], bool],
+        *,
+        refresh_after_send: bool = False,
     ) -> None:
-        if not self.states:
-            await self.async_fetch_devices()
-        state = self.states[device_id]
+        async with self._send_lock:
+            if self._reconnect_task is not None and not self._reconnect_task.done():
+                _LOGGER.info("Reconnecting Vanward WebSocket before sending command")
+                self._reconnect_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await self._reconnect_task
+                self._reconnect_task = None
+                await self.async_relogin()
+            if not self.states:
+                await self.async_fetch_devices()
+            before = self.states[device_id]
+            state = clone_state(self.states[device_id])
 
-        changed = mutator(state)
-        if not changed:
-            return
-        command, payload = update_status_payload(state)
-        try:
-            await self._send_raw(command, payload)
-        except VanwardSessionExpired:
-            await self.async_relogin()
-            await self._send_raw(command, payload)
-        self._notify_state(device_id, state)
+            changed = mutator(state)
+            if not changed:
+                return
+            changed_status = {
+                index: value
+                for index, value in enumerate(state.operational_status)
+                if before.operational_status[index] != value
+            }
+            command, payload = update_status_payload(state)
+            try:
+                await self._send_raw(command, payload)
+            except VanwardSessionExpired:
+                await self.async_relogin()
+                await self._send_raw(command, payload)
+            self.states[device_id] = state
+            self._pending_status[device_id] = (
+                changed_status,
+                time.monotonic() + PENDING_CONFIRM_TIMEOUT,
+            )
+            self._notify_state(device_id, state)
+            if refresh_after_send:
+                self._schedule_state_refresh()
 
-    async def _send_raw(self, command: int, payload: dict[str, Any] | None = None) -> None:
+    async def _send_raw(
+        self,
+        command: int,
+        payload: dict[str, Any] | None = None,
+    ) -> None:
         if not self.connected:
             await self.async_connect()
         if self._ws is None:
             raise VanwardApiError("WebSocket is not connected")
+        if command != COMMAND_HEARTBEAT:
+            _LOGGER.info("Sending Vanward command 0x%02x: %s", command, payload)
         await self._ws.send_bytes(encode_message(command, payload))
 
     async def _listen_loop(self) -> None:
@@ -265,6 +317,7 @@ class VanwardApiClient:
                     aiohttp.WSMsgType.CLOSED,
                     aiohttp.WSMsgType.ERROR,
                 ):
+                    self._schedule_reconnect()
                     break
             except asyncio.CancelledError:
                 raise
@@ -329,12 +382,64 @@ class VanwardApiClient:
                         "Ignoring status report for unknown device id: %s", device_id
                     )
                     return
-                self.states[device_id] = state_from_status(status, state.device_info)
+                updated = state_from_status(status, state.device_info)
+                pending = self._pending_status.get(device_id)
+                if pending is not None:
+                    pending_status, expires_at = pending
+                    if all(
+                        updated.operational_status[index] == value
+                        for index, value in pending_status.items()
+                    ):
+                        self._pending_status.pop(device_id, None)
+                    elif time.monotonic() < expires_at:
+                        _LOGGER.debug(
+                            "Ignoring stale Vanward status while waiting for command confirmation"
+                        )
+                        return
+                    else:
+                        self._pending_status.pop(device_id, None)
+                self.states[device_id] = updated
                 self._notify_state(device_id, self.states[device_id])
 
     def _notify_state(self, device_id: str, state: VanwardDeviceState) -> None:
         if self._state_callback is not None:
             self._state_callback(device_id, state)
+
+    def _schedule_reconnect(self) -> None:
+        if self._reconnect_task is None or self._reconnect_task.done():
+            self._reconnect_task = asyncio.create_task(self._reconnect_loop())
+
+    def _schedule_state_refresh(self) -> None:
+        if self._state_refresh_task is not None:
+            self._state_refresh_task.cancel()
+        self._state_refresh_task = asyncio.create_task(self._delayed_state_refresh())
+
+    async def _reconnect_loop(self) -> None:
+        await asyncio.sleep(5)
+        if self.connected:
+            return
+        _LOGGER.info("Reconnecting Vanward WebSocket after disconnect")
+        try:
+            await self.async_login()
+            await self.async_connect()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _LOGGER.exception("Error reconnecting Vanward WebSocket")
+            self._schedule_reconnect()
+
+    async def _delayed_state_refresh(self) -> None:
+        try:
+            await asyncio.sleep(1)
+            _LOGGER.info("Refreshing Vanward state after mode change")
+            if self.connected:
+                await self.async_refresh_session()
+            else:
+                await self.async_connect()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _LOGGER.exception("Error refreshing Vanward state")
 
     async def _wait_for_login_response(self) -> dict[str, VanwardDeviceState]:
         if self.states:

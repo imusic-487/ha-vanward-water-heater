@@ -118,7 +118,10 @@ def encode_message(command: int, payload: dict[str, Any] | None = None) -> bytes
     body = b""
     if payload is not None:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
-    return bytes([command]) + len(body).to_bytes(4, "big") + body
+    frame = bytes([command]) + len(body).to_bytes(4, "big") + body
+    if not body:
+        frame += b"\x00"
+    return frame
 
 
 def decode_message(message: bytes | bytearray) -> tuple[int, dict[str, Any]]:
@@ -190,6 +193,16 @@ def state_from_status(
         raw_status=status,
         operational_status=operational_status,
         device_info=device_info,
+    )
+
+
+def clone_state(state: VanwardDeviceState) -> VanwardDeviceState:
+    """Copy a device state before preparing a writable status update."""
+
+    return VanwardDeviceState(
+        raw_status=list(state.raw_status),
+        operational_status=list(state.operational_status),
+        device_info=state.device_info,
     )
 
 
@@ -293,12 +306,10 @@ def set_bathroom_mode(state: VanwardDeviceState, option: str) -> bool:
     if mode_data is None:
         raise ValueError(f"Unsupported bathroom mode: {option}")
 
-    mode, temperature, cruise_temperature = mode_data
+    mode, _temperature, _cruise_temperature = mode_data
     if state.operational_status[1] == mode:
         return False
     state.operational_status[1] = mode
-    state.operational_status[2] = temperature
-    state.operational_status[6] = cruise_temperature
     return True
 
 

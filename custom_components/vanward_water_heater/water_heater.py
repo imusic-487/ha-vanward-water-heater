@@ -57,9 +57,24 @@ class VanwardWaterHeater(VanwardEntity, WaterHeaterEntity):
     def target_temperature(self) -> int:
         return self.coordinator.data.target_temperature
 
+    @property
+    def target_temperature_high(self) -> int | None:
+        if self.coordinator.data.bathroom_mode == "自适温":
+            return self.coordinator.data.target_temperature
+        return None
+
+    @property
+    def target_temperature_low(self) -> int | None:
+        if self.coordinator.data.bathroom_mode == "自适温":
+            return self.coordinator.data.target_temperature
+        return None
+
     async def async_set_temperature(self, **kwargs: object) -> None:
         temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is None:
+            return
+        if self.coordinator.data.bathroom_mode == "自适温":
+            _LOGGER.debug("Ignoring target temperature change in adaptive mode")
             return
         await self.coordinator.client.async_set_target_temperature(
             self.coordinator.device_id, int(float(temperature))
