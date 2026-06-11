@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "account": {
+        "title": "Vanward Water Heater",
+        "description": "Enter your Vanward account credentials.",
+        "data": {
+          "mobile": "Mobile",
+          "password": "Password"
+        }
+      },
+      "devices": {
+        "title": "Select water heaters",
+        "description": "Select one or more unconfigured devices.",
+        "data": {
+          "device_ids": "Devices"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Vanward Water Heater",
+        "description": "Enter your Vanward account credentials again.",
+        "data": {
+          "mobile": "Mobile",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "no_device": "No matching water heater was found",
+      "no_device_selected": "Select at least one device"
+    },
+    "abort": {
+      "devices_added": "Selected devices were added",
+      "no_unconfigured_devices": "There are no unconfigured water heaters",
+      "reauth_successful": "Reauthentication was successful"
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": { "name": "Power" },
+      "boost": { "name": "Water Boost" },
+      "single_cruise": { "name": "Single Cruise" },
+      "enjoy_cruise": { "name": "E Enjoy Cruise" }
+    },
+    "select": {
+      "cruise_mode": { "name": "Cruise Mode" },
+      "bathroom_mode": { "name": "Bathroom Mode" }
+    },
+    "number": {
+      "target_temperature": { "name": "Target Temperature" },
+      "cruise_temperature": { "name": "Cruise Temperature" }
+    },
+    "sensor": {
+      "current_water_usage": { "name": "Current Water Usage" },
+      "current_gas_usage": { "name": "Current Gas Usage" },
+      "total_water_usage": { "name": "Total Water Usage" },
+      "total_gas_usage": { "name": "Total Gas Usage" }
+    },
+    "binary_sensor": {
+      "heating": { "name": "Heating" },
+      "water_flowing": { "name": "Water Flowing" },
+      "fan": { "name": "Fan" },
+      "antifreeze": { "name": "Antifreeze" }
+    },
+    "button": {
+      "call": { "name": "Call" }
+    },
+    "water_heater": {
+      "water_heater": { "name": "Water Heater" }
+    }
+  }
+}

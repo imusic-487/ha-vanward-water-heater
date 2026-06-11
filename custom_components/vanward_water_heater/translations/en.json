@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "account": {
+        "title": "Vanward Water Heater",
+        "description": "Enter your Vanward account credentials.",
+        "data": {
+          "mobile": "Mobile",
+          "password": "Password"
+        }
+      },
+      "devices": {
+        "title": "Select water heaters",
+        "description": "Select one or more unconfigured devices.",
+        "data": {
+          "device_ids": "Devices"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Vanward Water Heater",
+        "description": "Enter your Vanward account credentials again.",
+        "data": {
+          "mobile": "Mobile",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "no_device": "No matching water heater was found",
+      "no_device_selected": "Select at least one device"
+    },
+    "abort": {
+      "devices_added": "Selected devices were added",
+      "no_unconfigured_devices": "There are no unconfigured water heaters",
+      "reauth_successful": "Reauthentication was successful"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+"""Common entity base for Vanward water heaters."""
+
+from __future__ import annotations
+
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import DOMAIN
+from .coordinator import VanwardCoordinator
+
+
+class VanwardEntity(CoordinatorEntity[VanwardCoordinator]):
+    """Base entity."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, coordinator: VanwardCoordinator, key: str, translation_key: str
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.device_id}_{key}"
+        self._attr_translation_key = translation_key
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        state = self.coordinator.data
+        info = state.device_info
+        return DeviceInfo(
+            identifiers={(DOMAIN, info.device_id)},
+            manufacturer="Vanward",
+            name=info.name or "万和热水器",
+            model=info.model,
+            sw_version=info.series,
+        )

@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "account": {
+        "title": "万和热水器",
+        "description": "输入万和账号信息。",
+        "data": {
+          "mobile": "手机号",
+          "password": "密码"
+        }
+      },
+      "devices": {
+        "title": "选择热水器",
+        "description": "选择一个或多个尚未配置的设备。",
+        "data": {
+          "device_ids": "设备"
+        }
+      },
+      "reauth_confirm": {
+        "title": "重新认证万和热水器",
+        "description": "重新输入万和账号信息。",
+        "data": {
+          "mobile": "手机号",
+          "password": "密码"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "连接失败",
+      "invalid_auth": "账号或密码错误",
+      "no_device": "未找到匹配的热水器",
+      "no_device_selected": "请至少选择一个设备"
+    },
+    "abort": {
+      "devices_added": "已添加所选设备",
+      "no_unconfigured_devices": "没有未配置的热水器",
+      "reauth_successful": "重新认证成功"
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": { "name": "热水器开关" },
+      "boost": { "name": "水增压开关" },
+      "single_cruise": { "name": "单次巡航" },
+      "enjoy_cruise": { "name": "E享巡航" }
+    },
+    "select": {
+      "cruise_mode": { "name": "巡航模式" },
+      "bathroom_mode": { "name": "卫浴模式" }
+    },
+    "number": {
+      "target_temperature": { "name": "热水器温度" },
+      "cruise_temperature": { "name": "巡航温度" }
+    },
+    "sensor": {
+      "current_water_usage": { "name": "实时产水量" },
+      "current_gas_usage": { "name": "实时耗气量" },
+      "total_water_usage": { "name": "总耗水量" },
+      "total_gas_usage": { "name": "总耗气量" }
+    },
+    "binary_sensor": {
+      "heating": { "name": "加热状态" },
+      "water_flowing": { "name": "通水状态" },
+      "fan": { "name": "风扇状态" },
+      "antifreeze": { "name": "防冻功能" }
+    },
+    "button": {
+      "call": { "name": "呼叫" }
+    },
+    "water_heater": {
+      "water_heater": { "name": "热水器" }
+    }
+  }
+}
