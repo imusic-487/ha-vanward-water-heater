@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
@@ -15,6 +16,8 @@ from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
 
+_LOGGER = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class VanwardSelectDescription:
@@ -23,6 +26,7 @@ class VanwardSelectDescription:
     options: list[str]
     value_fn: Callable[[VanwardDeviceState], str | None]
     set_fn: Callable[[VanwardCoordinator, str], Awaitable[None]]
+    translation_placeholders: dict[str, str] | None = None
 
 
 SELECTS = [
@@ -51,11 +55,13 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
-    async_add_entities(
+    entities = [
         VanwardSelect(coordinator, description)
         for coordinator in coordinators
         for description in SELECTS
-    )
+    ]
+    _LOGGER.debug("Adding %s Vanward select entities", len(entities))
+    async_add_entities(entities)
 
 
 class VanwardSelect(VanwardEntity, SelectEntity):

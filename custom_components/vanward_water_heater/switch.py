@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+import logging
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -15,6 +16,8 @@ from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
 
+_LOGGER = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class VanwardSwitchDescription:
@@ -22,6 +25,7 @@ class VanwardSwitchDescription:
     translation_key: str
     value_fn: Callable[[VanwardDeviceState], bool]
     set_fn: Callable[[VanwardCoordinator, bool], Awaitable[None]]
+    translation_placeholders: dict[str, str] | None = None
 
 
 SWITCHES = [
@@ -64,11 +68,13 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
-    async_add_entities(
+    entities = [
         VanwardSwitch(coordinator, description)
         for coordinator in coordinators
         for description in SWITCHES
-    )
+    ]
+    _LOGGER.debug("Adding %s Vanward switch entities", len(entities))
+    async_add_entities(entities)
 
 
 class VanwardSwitch(VanwardEntity, SwitchEntity):

@@ -143,10 +143,13 @@ class VanwardConfigFlow(ConfigFlow, domain=DOMAIN):
             if not selected:
                 errors["base"] = "no_device_selected"
             elif self._existing_entry is not None:
-                existing_ids = list(self._existing_entry.data[CONF_DEVICE_IDS])
+                existing_ids = [
+                    str(device_id)
+                    for device_id in self._existing_entry.data[CONF_DEVICE_IDS]
+                ]
                 updated_data = {
                     **self._existing_entry.data,
-                    CONF_DEVICE_IDS: existing_ids + selected,
+                    CONF_DEVICE_IDS: [*existing_ids, *selected],
                 }
                 self.hass.config_entries.async_update_entry(
                     self._existing_entry, data=updated_data
@@ -215,7 +218,9 @@ class VanwardConfigFlow(ConfigFlow, domain=DOMAIN):
     def _configured_device_ids(self) -> set[str]:
         device_ids: set[str] = set()
         for entry in self._async_current_entries():
-            device_ids.update(entry.data.get(CONF_DEVICE_IDS, []))
+            device_ids.update(
+                str(device_id) for device_id in entry.data.get(CONF_DEVICE_IDS, [])
+            )
         return device_ids
 
     def _existing_account_entry(self):

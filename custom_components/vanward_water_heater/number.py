@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+import logging
 
 from homeassistant.components.number import NumberDeviceClass, NumberEntity
 from homeassistant.config_entries import ConfigEntry
@@ -16,6 +17,8 @@ from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
 
+_LOGGER = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class VanwardNumberDescription:
@@ -25,6 +28,7 @@ class VanwardNumberDescription:
     maximum: int
     value_fn: Callable[[VanwardDeviceState], int]
     set_fn: Callable[[VanwardCoordinator, int], Awaitable[None]]
+    translation_placeholders: dict[str, str] | None = None
 
 
 NUMBERS = [
@@ -55,11 +59,13 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
-    async_add_entities(
+    entities = [
         VanwardNumber(coordinator, description)
         for coordinator in coordinators
         for description in NUMBERS
-    )
+    ]
+    _LOGGER.debug("Adding %s Vanward number entities", len(entities))
+    async_add_entities(entities)
 
 
 class VanwardNumber(VanwardEntity, NumberEntity):

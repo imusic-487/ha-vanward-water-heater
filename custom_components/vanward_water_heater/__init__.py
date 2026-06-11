@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
@@ -11,6 +13,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import VanwardApiClient, VanwardAuthError
 from .const import CONF_DEVICE_IDS, CONF_MOBILE, DOMAIN, PLATFORMS
 from .coordinator import VanwardCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -23,7 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         password=entry.data[CONF_PASSWORD],
     )
     try:
-        await client.async_fetch_devices()
+        states = await client.async_fetch_devices()
     except VanwardAuthError as err:
         raise ConfigEntryAuthFailed from err
     except Exception as err:
@@ -31,9 +35,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     coordinators: dict[str, VanwardCoordinator] = {}
     for device_id in entry.data[CONF_DEVICE_IDS]:
+        device_id = str(device_id)
+        state = states.get(device_id)
+        if state is None:
+            _LOGGER.warning(
+                "Configured Vanward device %s was not returned by the account",
+                device_id,
+            )
+            continue
         coordinator = VanwardCoordinator(hass, client, device_id)
         coordinators[device_id] = coordinator
-        await coordinator.async_start()
+        coordinator.async_set_updated_data(state)
+
+    if not coordinators:
+        raise ConfigEntryNotReady("No configured Vanward devices are currently available")
 
     @callback
     def _state_updated(device_id: str, state) -> None:

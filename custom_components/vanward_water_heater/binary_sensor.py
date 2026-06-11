@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import logging
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -15,12 +16,15 @@ from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 from .protocol import VanwardDeviceState
 
+_LOGGER = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class VanwardBinarySensorDescription:
     key: str
     translation_key: str
     value_fn: Callable[[VanwardDeviceState], bool]
+    translation_placeholders: dict[str, str] | None = None
 
 
 BINARY_SENSORS = [
@@ -51,11 +55,13 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
-    async_add_entities(
+    entities = [
         VanwardBinarySensor(coordinator, description)
         for coordinator in coordinators
         for description in BINARY_SENSORS
-    )
+    ]
+    _LOGGER.debug("Adding %s Vanward binary sensor entities", len(entities))
+    async_add_entities(entities)
 
 
 class VanwardBinarySensor(VanwardEntity, BinarySensorEntity):

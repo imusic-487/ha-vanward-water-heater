@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -11,12 +13,16 @@ from .const import DOMAIN
 from .coordinator import VanwardCoordinator
 from .entity import VanwardEntity
 
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"].values()
-    async_add_entities(VanwardCallButton(coordinator) for coordinator in coordinators)
+    entities = [VanwardCallButton(coordinator) for coordinator in coordinators]
+    _LOGGER.debug("Adding %s Vanward button entities", len(entities))
+    async_add_entities(entities)
 
 
 class VanwardCallButton(VanwardEntity, ButtonEntity):

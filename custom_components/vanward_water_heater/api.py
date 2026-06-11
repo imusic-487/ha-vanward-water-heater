@@ -309,6 +309,8 @@ class VanwardApiClient:
             if device_id is None and len(self.states) == 1:
                 device_id = next(iter(self.states))
             if status is not None:
+                if device_id is not None:
+                    device_id = str(device_id)
                 state = self.states.get(device_id)
                 if state is None:
                     _LOGGER.debug(

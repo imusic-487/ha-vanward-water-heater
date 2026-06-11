@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import logging
 import time
 from typing import Any
 
@@ -12,6 +13,8 @@ from .const import (
     BATHROOM_MODE_MAP,
     COMMAND_UPDATE_STATUS,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -41,10 +44,6 @@ class VanwardDeviceState:
         mode = self.operational_status[1]
         value = BATHROOM_MODE_MAP.get(mode)
         return value[0] if value else None
-
-    @property
-    def current_temperature(self) -> int:
-        return self.raw_status[6]
 
     @property
     def target_temperature(self) -> int:
@@ -132,7 +131,15 @@ def decode_message(message: bytes | bytearray) -> tuple[int, dict[str, Any]]:
     payload_bytes = bytes(message[5 : 5 + length])
     if not payload_bytes:
         return command, {}
-    return command, json.loads(payload_bytes.decode())
+    try:
+        return command, json.loads(payload_bytes.decode())
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        _LOGGER.debug(
+            "Ignoring non-JSON Vanward frame for command 0x%02x: %r",
+            command,
+            payload_bytes,
+        )
+        return command, {}
 
 
 def states_from_login_payload(payload: dict[str, Any]) -> dict[str, VanwardDeviceState]:
@@ -141,10 +148,11 @@ def states_from_login_payload(payload: dict[str, Any]) -> dict[str, VanwardDevic
     devices = payload.get("data", {}).get("Devices") or payload.get("Devices") or []
     states: dict[str, VanwardDeviceState] = {}
     for device in devices:
-        device_id = device.get("DeviceId")
+        raw_device_id = device.get("DeviceId")
         status = device.get("Status")
-        if not device_id or not status:
+        if raw_device_id is None or not status:
             continue
+        device_id = str(raw_device_id)
         product = device.get("Product") or {}
         info = VanwardDeviceInfo(
             device_id=device_id,
