@@ -25,6 +25,7 @@ class VanwardDeviceInfo:
     model: str | None = None
     series: str | None = None
     name: str | None = None
+    device_type: str | None = None  # e.g. 电热水器 / 燃气热水器（登录 payload Product.Type）
 
 
 @dataclass(slots=True)
@@ -34,9 +35,13 @@ class VanwardDeviceState:
     raw_status: list[int]
     operational_status: list[int]
     device_info: VanwardDeviceInfo
+    electric: bool = False
 
     @property
     def power(self) -> bool:
+        # 电热水器: [1]=电源; 燃气: operational[0] (即原始 status[1])
+        if self.electric:
+            return bool(self.operational_status[1])
         return bool(self.operational_status[0])
 
     @property
@@ -47,7 +52,28 @@ class VanwardDeviceState:
 
     @property
     def target_temperature(self) -> int:
+        if self.electric:
+            return self.operational_status[6]
         return self.operational_status[2]
+
+    @property
+    def current_temperature(self) -> int | None:
+        """Current water temperature (electric heaters only)."""
+        if self.electric and len(self.operational_status) > 7:
+            return self.operational_status[7]
+        return None
+
+    @property
+    def heating(self) -> bool:
+        """Heating state.
+
+        Electric heaters (E-series, 27-field layout): [2] is the heating flag
+        (3 = heating, 16 = idle) — confirmed by 3-point capture on 2026-08-11.
+        Gas heaters: bit 0 of raw_status[8].
+        """
+        if self.electric:
+            return self.operational_status[2] == 3
+        return _raw_bit_enabled(self.raw_status, 8, 0x01)
 
     @property
     def boost(self) -> bool:
@@ -94,10 +120,6 @@ class VanwardDeviceState:
     @property
     def total_gas_usage(self) -> float | None:
         return _scale_status(self.raw_status, 15)
-
-    @property
-    def heating(self) -> bool:
-        return _raw_bit_enabled(self.raw_status, 8, 0x01)
 
     @property
     def water_flowing(self) -> bool:
@@ -149,6 +171,20 @@ def states_from_login_payload(payload: dict[str, Any]) -> dict[str, VanwardDevic
     """Build all device states returned by login."""
 
     devices = payload.get("data", {}).get("Devices") or payload.get("Devices") or []
+    _LOGGER.warning(
+        "[vanward-debug] login payload keys: %s; devices count: %d",
+        list(payload.keys()),
+        len(devices),
+    )
+    for i, device in enumerate(devices):
+        status = device.get("Status")
+        _LOGGER.warning(
+            "[vanward-debug] device[%d] keys=%s status_len=%s status=%s",
+            i,
+            list(device.keys()),
+            len(status) if status is not None else None,
+            status,
+        )
     states: dict[str, VanwardDeviceState] = {}
     for device in devices:
         raw_device_id = device.get("DeviceId")
@@ -162,37 +198,72 @@ def states_from_login_payload(payload: dict[str, Any]) -> dict[str, VanwardDevic
             model=product.get("Model"),
             series=product.get("Series"),
             name=device.get("Name") or product.get("Name"),
+            device_type=product.get("Type") or device.get("catagoryName"),
         )
-        states[device_id] = state_from_status(status, info)
+        try:
+            states[device_id] = state_from_status(status, info)
+        except ValueError as err:
+            # 容错：字段数不够时不崩，打日志继续
+            _LOGGER.error(
+                "[vanward-debug] device %s state parse failed: %s; raw_status=%s",
+                device_id,
+                err,
+                status,
+            )
     return states
 
 
 def state_from_status(
-    status: list[int], device_info: VanwardDeviceInfo
+    status: list[int], device_info: VanwardDeviceState
 ) -> VanwardDeviceState:
-    """Convert the raw status list into the writable operational status list."""
+    """Convert the raw status list into the writable operational status list.
 
-    if len(status) <= 33:
+    Supports two layouts:
+      - gas heater:  >= 34 fields (author's original layout)
+      - electric heater: 27 fields (e.g. E60-Q2WY10-20)
+          [1] power, [6] target temperature, [7] current temperature
+    """
+
+    if len(status) >= 34:
+        # 燃气布局（原逻辑）
+        operational_status = [
+            status[1],
+            status[2],
+            status[6],
+            status[25],
+            status[4],
+            status[18],
+            status[19],
+            status[20],
+            status[21],
+            0,
+            0,
+            status[33],
+        ]
+    elif len(status) >= 27:
+        # 电热水器布局（27 字段，读写同布局）
+        _LOGGER.info(
+            "[vanward] electric heater layout detected (len=%d) for %s",
+            len(status),
+            device_info.device_id,
+        )
+        operational_status = list(status)
+    else:
+        _LOGGER.error(
+            "[vanward] unsupported status length %d: %s",
+            len(status),
+            status,
+        )
         raise ValueError("Status payload does not contain the expected fields")
 
-    operational_status = [
-        status[1],
-        status[2],
-        status[6],
-        status[25],
-        status[4],
-        status[18],
-        status[19],
-        status[20],
-        status[21],
-        0,
-        0,
-        status[33],
-    ]
     return VanwardDeviceState(
-        raw_status=status,
+        raw_status=list(status),
         operational_status=operational_status,
         device_info=device_info,
+        electric=(
+            "电" in (device_info.device_type or "")
+            or len(status) < 34
+        ),
     )
 
 
@@ -225,9 +296,10 @@ def update_status_payload(state: VanwardDeviceState) -> tuple[int, dict[str, Any
 
 def set_power(state: VanwardDeviceState, enabled: bool) -> bool:
     value = int(enabled)
-    if state.operational_status[0] == value:
+    idx = 1 if state.electric else 0
+    if state.operational_status[idx] == value:
         return False
-    state.operational_status[0] = value
+    state.operational_status[idx] = value
     return True
 
 
@@ -236,9 +308,10 @@ def set_boost(state: VanwardDeviceState, enabled: bool) -> bool:
 
 
 def set_target_temperature(state: VanwardDeviceState, temperature: int) -> bool:
-    if state.operational_status[2] == temperature:
+    idx = 6 if state.electric else 2
+    if state.operational_status[idx] == temperature:
         return False
-    state.operational_status[2] = temperature
+    state.operational_status[idx] = temperature
     return True
 
 

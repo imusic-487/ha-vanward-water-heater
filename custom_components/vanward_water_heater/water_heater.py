@@ -58,6 +58,11 @@ class VanwardWaterHeater(VanwardEntity, WaterHeaterEntity):
         return self.coordinator.data.target_temperature
 
     @property
+    def current_temperature(self) -> float | None:
+        """Current water temperature (electric heaters)."""
+        return self.coordinator.data.current_temperature
+
+    @property
     def target_temperature_high(self) -> int | None:
         if self.coordinator.data.bathroom_mode == "自适温":
             return self.coordinator.data.target_temperature
