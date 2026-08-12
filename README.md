@@ -49,6 +49,20 @@ https://github.com/imusic-487/ha-vanward-water-heater
 
 搜索 `Vanward Water Heater`，并按照配置流程完成添加。
 
+## HomeKit 接入
+
+通过 HomeKit 桥（HASS Bridge）配对后，热水器会以 **WaterHeater（热水器）** 配件出现在家庭 App 中，可查看水温、目标温度与操作模式。
+
+**注意**：WaterHeater 配件自带当前水温特征，iOS 家庭 App 会把它和其他温度设备一起显示在"温度"分类中——这是 HomeKit 的正常设计，并非错误。
+
+**如不希望水温出现在"环境温度"汇总里**：
+
+1. 打开家庭 App → 找到热水器配件
+2. 长按卡片 → 设置（齿轮）
+3. 关闭 **"包含在家庭摘要中"（Include in Home Summaries）**
+
+热水器卡片上的水温不受影响，照常显示。
+
 ## 免责声明
 
 本项目是非官方社区集成，与万和官方无关联，也不受万和官方支持或背书。请自行承担使用风险。设备行为、云端连接和兼容性可能随时变化。

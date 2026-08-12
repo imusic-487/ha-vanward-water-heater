@@ -49,6 +49,20 @@ Settings -> Devices & services -> Add integration
 
 Search for `Vanward Water Heater` and follow the setup flow.
 
+## HomeKit
+
+After pairing via the HomeKit bridge (HASS Bridge), the heater appears as a **WaterHeater** accessory in the Home app — water temperature, target temperature and operation mode are all visible.
+
+**Note**: the WaterHeater accessory carries its own current-temperature characteristic, so iOS Home shows it alongside other temperature devices under the "Temperature" category. This is normal HomeKit behavior, not a bug.
+
+**To keep the water temperature out of the "ambient temperature" summary**:
+
+1. Open the Home app → find the heater accessory
+2. Long-press the tile → Settings (gear icon)
+3. Turn off **"Include in Home Summaries"**
+
+The water temperature on the heater's own tile is unaffected.
+
 ## Disclaimer
 
 This project is an unofficial community integration and is not affiliated with, endorsed by, or supported by Vanward. Use it at your own risk. Device behavior, cloud connectivity, and compatibility may change without notice.
