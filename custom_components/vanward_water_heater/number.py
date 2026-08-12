@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import logging
 
 from homeassistant.components.number import (
+    NumberDeviceClass,
     NumberEntity,
     NumberEntityDescription,
 )
@@ -34,6 +35,7 @@ NUMBERS = [
     VanwardNumberDescription(
         key="cruise_temperature",
         translation_key="cruise_temperature",
+        device_class=NumberDeviceClass.TEMPERATURE,
         native_min_value=34,
         native_max_value=43,
         native_step=1,

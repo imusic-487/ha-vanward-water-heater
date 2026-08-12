@@ -66,8 +66,8 @@ https://github.com/imusic-487/ha-vanward-water-heater
 ## 更新记录
 
 ### 2026-08-12
-- **修复**：`number.py` 移除巡航温度实体的 `device_class=temperature`——巡航温度是目标设置值而非环境温度，移除后 HomeKit 桥不再将其作为温度传感器暴露（解决 HomeKit 环境温度被水温污染的问题）
-- **文档**：新增 HomeKit 接入说明（水温出现在环境温度汇总时的解法：关闭「包含在家庭摘要中 / Include in Home Summaries」）
+- **修复（无代码改动）**：HomeKit 环境温度汇总中包含热水器水温的问题，通过 iOS 家庭 App 关闭「包含在家庭摘要中 / Include in Home Summaries」解决（详见上方 HomeKit 接入小节）
+- **说明**：曾尝试移除 `number.py` 中巡航温度实体的 `device_class=temperature`，经评估后回退——该实体未被 HomeKit 暴露（Number 域不在包含列表），改动对解决问题无实际作用，且可能影响其他依赖此分类的用户，故保持与上游一致
 - **文档**：README 重构为中英双语（中文主文件 + 独立英文版）
 
 ### 2026-08-11

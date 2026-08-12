@@ -66,8 +66,8 @@ The water temperature on the heater's own tile is unaffected.
 ## Changelog
 
 ### 2026-08-12
-- **Fix**: removed `device_class=temperature` from the cruise-temperature number entity in `number.py` — cruise temperature is a target setting, not an ambient reading; without the class the HomeKit bridge no longer exposes it as a temperature sensor (fixes the water temperature polluting the Home ambient-temperature list)
-- **Docs**: added HomeKit section (how to keep the water temperature out of the ambient summary: turn off **"Include in Home Summaries"**)
+- **Fix (no code change)**: water temperature appearing in the Home ambient-temperature summary is resolved by turning off **"Include in Home Summaries"** for the heater accessory in the iOS Home app (see the HomeKit section above)
+- **Note**: an attempt to remove `device_class=temperature` from the cruise-temperature number entity in `number.py` was evaluated and reverted — that entity is not exposed to HomeKit (Number domain not in the include list), so the change had no practical effect and could affect other users relying on the classification; keeping upstream behavior
 - **Docs**: README restructured to bilingual (Chinese primary + separate English file)
 
 ### 2026-08-11
