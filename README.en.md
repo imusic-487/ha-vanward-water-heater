@@ -63,6 +63,16 @@ After pairing via the HomeKit bridge (HASS Bridge), the heater appears as a **Wa
 
 The water temperature on the heater's own tile is unaffected.
 
+## Changelog
+
+### 2026-08-12
+- **Fix**: removed `device_class=temperature` from the cruise-temperature number entity in `number.py` — cruise temperature is a target setting, not an ambient reading; without the class the HomeKit bridge no longer exposes it as a temperature sensor (fixes the water temperature polluting the Home ambient-temperature list)
+- **Docs**: added HomeKit section (how to keep the water temperature out of the ambient summary: turn off **"Include in Home Summaries"**)
+- **Docs**: README restructured to bilingual (Chinese primary + separate English file)
+
+### 2026-08-11
+- **Added**: electric water heater support (E60-Q2WY10-20) — auto-detects the 27-field status layout + reads current water temperature
+
 ## Disclaimer
 
 This project is an unofficial community integration and is not affiliated with, endorsed by, or supported by Vanward. Use it at your own risk. Device behavior, cloud connectivity, and compatibility may change without notice.
