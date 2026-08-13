@@ -8,12 +8,17 @@ A Home Assistant custom integration for Vanward water heaters. The original plug
 
 ## Differences from upstream
 
-### New: Electric water heater support
+### New: Electric water heater support (v3.1)
 - `protocol.py`: auto-detects gas vs electric status layouts based on device type. Electric heaters only expose 27 status fields (no `gas_usage` / `water_flowing` / `fan` fields), which previously caused `ValueError: Status payload does not contain the expected fields`
+- **Electric mode code table**: Normal(1) / Medium-temp(2) / Anti-bacteria(10) / Capacity-boost(12) / ECO peak-off-peak(32) / e-push(35), mapped bidirectionally for read & write (e-push with auto-off flag reads back as 43, normalized to e-push for display)
+- **Dual-track read/write**: electric layout writes mode to `Status[4]` and temperature to `Status[6]`, automatically distinguished from the gas layout (mode at `Status[1]`) — the two layouts never interfere
+- **Temperature range**: 35–75°C for electric heaters (gas version: 30–65°C), adaptive per device type
 - `water_heater.py`: exposes `current_temperature` for electric heaters
+- **4 new electric sensors**: current water temperature / target temperature / current mode / power status
+- **Feature bitmask**: flags like auto power-off are read/written bitwise with explanatory comments to avoid corrupting other bits
 - Gas heater behavior is completely unchanged
 
-**Tested on**: Home Assistant 2026.7.4 + Vanward E60-Q2WY10-20 (60L electric heater). Integration loads cleanly and water temperature reads correctly.
+**Tested on**: Home Assistant 2026.7.4 + Vanward E60-Q2WY10-20 (60L electric heater). Integration loads cleanly, water temperature reads correctly, all 6 entities work.
 
 **Known limitations**:
 - Only tested on E60-Q2WY10-20; other electric models (different capacities/newer revisions) are unverified
@@ -49,11 +54,16 @@ Settings -> Devices & services -> Add integration
 
 Search for `Vanward Water Heater` and follow the setup flow.
 
+The 4 new electric sensors (current water temp / target temp / current mode / power status) appear automatically and can be used directly in dashboards, automations, or trend graphs.
+
 ## HomeKit
 
 After pairing via the HomeKit bridge (HASS Bridge), the heater appears as a **WaterHeater** accessory in the Home app — water temperature, target temperature and operation mode are all visible.
 
-**Note**: the WaterHeater accessory carries its own current-temperature characteristic, so iOS Home shows it alongside other temperature devices under the "Temperature" category. This is normal HomeKit behavior, not a bug.
+**Notes**:
+- The HomeKit protocol only exposes "Off / Heat" as heating states for water heaters (protocol limitation, not a plugin issue); modes like Anti-bacteria / ECO / e-push are selected in HA
+- HomeKit control is **bidirectional**: changing the target temperature or switching the device in the Home app really does send the command to the heater
+- The WaterHeater accessory carries its own current-temperature characteristic, so iOS Home shows it alongside other temperature devices under the "Temperature" category. This is normal HomeKit behavior, not a bug.
 
 **To keep the water temperature out of the "ambient temperature" summary**:
 
@@ -61,9 +71,15 @@ After pairing via the HomeKit bridge (HASS Bridge), the heater appears as a **Wa
 2. Long-press the tile → Settings (gear icon)
 3. Turn off **"Include in Home Summaries"**
 
-The water temperature on the heater's own tile is unaffected.
+**Electric sensors & HomeKit**: the current-water-temp / target-temp sensors (sensor domain) are bridged to HomeKit as standalone temperature accessories by default; if not needed, add them to the bridge's `exclude_entities` list in the HomeKit bridge configuration.
 
 ## Changelog
+
+### 2026-08-13
+- **Added (v3.1)**: electric mode code table (Normal/Medium/Anti-bacteria/Capacity-boost/ECO/e-push) with bidirectional read/write mapping; dual-track mode/temperature read-write (electric Status[4]/Status[6]); adaptive temperature range 35–75°C; feature bitmask read/write
+- **Added (v3.1)**: 4 electric sensors — current water temperature / target temperature / current mode / power status
+- **Fixed**: 3 CRITICAL + 3 MAJOR issues found in code review (mode read position, electric mode code table, ghost entity hiding, temperature range, e-push flag, missing tests)
+- **HomeKit**: electric sensors are bridged as standalone temperature accessories by default; excludable via bridge config
 
 ### 2026-08-12
 - **Fix (no code change)**: water temperature appearing in the Home ambient-temperature summary is resolved by turning off **"Include in Home Summaries"** for the heater accessory in the iOS Home app (see the HomeKit section above)
@@ -75,7 +91,7 @@ The water temperature on the heater's own tile is unaffected.
 
 ## Disclaimer
 
-This project is an unofficial community integration and is not affiliated with, endorsed by, or supported by Vanward. Use it at your own risk. Device behavior, cloud connectivity, and compatibility may change without notice.
+This project is an unofficial community integration and is not affiliated with, endorsed by, or supported by Vanward. It is implemented by analyzing the device's local communication protocol and contains no proprietary vendor code or assets. Use it at your own risk. Device behavior, cloud connectivity, and compatibility may change without notice.
 
 ## License
 
