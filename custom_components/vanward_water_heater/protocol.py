@@ -12,6 +12,8 @@ from .const import (
     BATHROOM_MODE_BY_NAME,
     BATHROOM_MODE_MAP,
     COMMAND_UPDATE_STATUS,
+    ELECTRIC_MODE_BY_NAME,
+    ELECTRIC_MODE_MAP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,8 +48,11 @@ class VanwardDeviceState:
 
     @property
     def bathroom_mode(self) -> str | None:
-        mode = self.operational_status[1]
-        value = BATHROOM_MODE_MAP.get(mode)
+        # 双轨：燃气布局模式在重排后 operational[1]（原 status[2]）；电热在 [4]（C1 修正）
+        idx = 4 if self.electric else 1
+        mode = self.operational_status[idx]
+        table = ELECTRIC_MODE_MAP if self.electric else BATHROOM_MODE_MAP
+        value = table.get(mode)
         return value[0] if value else None
 
     @property
@@ -171,15 +176,15 @@ def states_from_login_payload(payload: dict[str, Any]) -> dict[str, VanwardDevic
     """Build all device states returned by login."""
 
     devices = payload.get("data", {}).get("Devices") or payload.get("Devices") or []
-    _LOGGER.warning(
-        "[vanward-debug] login payload keys: %s; devices count: %d",
+    _LOGGER.debug(
+        "[vanward] login payload keys: %s; devices count: %d",
         list(payload.keys()),
         len(devices),
     )
     for i, device in enumerate(devices):
         status = device.get("Status")
-        _LOGGER.warning(
-            "[vanward-debug] device[%d] keys=%s status_len=%s status=%s",
+        _LOGGER.debug(
+            "[vanward] device[%d] keys=%s status_len=%s status=%s",
             i,
             list(device.keys()),
             len(status) if status is not None else None,
@@ -205,7 +210,7 @@ def states_from_login_payload(payload: dict[str, Any]) -> dict[str, VanwardDevic
         except ValueError as err:
             # 容错：字段数不够时不崩，打日志继续
             _LOGGER.error(
-                "[vanward-debug] device %s state parse failed: %s; raw_status=%s",
+                "[vanward] device %s state parse failed: %s; raw_status=%s",
                 device_id,
                 err,
                 status,
@@ -375,14 +380,17 @@ def set_cruise_mode(state: VanwardDeviceState, option: str) -> bool:
 
 
 def set_bathroom_mode(state: VanwardDeviceState, option: str) -> bool:
-    mode_data = BATHROOM_MODE_BY_NAME.get(option)
+    # 双轨：燃气模式写重排后 operational[1]，电热写 [4]（C1 修正）
+    table = ELECTRIC_MODE_BY_NAME if state.electric else BATHROOM_MODE_BY_NAME
+    mode_data = table.get(option)
     if mode_data is None:
         raise ValueError(f"Unsupported bathroom mode: {option}")
 
     mode, _temperature, _cruise_temperature = mode_data
-    if state.operational_status[1] == mode:
+    idx = 4 if state.electric else 1
+    if state.operational_status[idx] == mode:
         return False
-    state.operational_status[1] = mode
+    state.operational_status[idx] = mode
     return True
 
 
@@ -404,7 +412,18 @@ def _raw_bit_enabled(status: list[int], index: int, mask: int) -> bool:
 
 
 def _bit_enabled(value: int, index: int) -> bool:
+    # 位序约定（N1 注释）：字符串高位索引，index 0 = MSB —— 燃气原逻辑，勿改
     return f"{value:08b}"[index] == "1"
+
+
+def _mask_enabled(value: int, mask: int) -> bool:
+    # 低位掩码风格，bit0 = LSB（电热 Status[24] 功能位用，如 bit1 = 0x02）
+    return bool(value & mask)
+
+
+def _set_mask(value: int, mask: int, enabled: bool) -> int:
+    # 低位掩码置位/清位（电热 Status[24] 功能位用）
+    return value | mask if enabled else value & ~mask
 
 
 def _set_status_bit(state: VanwardDeviceState, bit_index: int, enabled: bool) -> bool:
@@ -417,6 +436,7 @@ def _set_status_bit(state: VanwardDeviceState, bit_index: int, enabled: bool) ->
 
 
 def _replace_bit(value: int, index: int, enabled: bool) -> int:
+    # 位序约定（N1 注释）：字符串高位索引，index 0 = MSB —— 燃气原逻辑，勿改
     bits = list(f"{value:08b}")
     bits[index] = "1" if enabled else "0"
     return int("".join(bits), 2)
