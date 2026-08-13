@@ -38,6 +38,8 @@ class VanwardDeviceState:
     operational_status: list[int]
     device_info: VanwardDeviceInfo
     electric: bool = False
+    # v3.2: 设备在线状态（来自登录 payload isOnline 字段，万和 App 的"设备离线"同源）
+    online: bool = True
 
     @property
     def power(self) -> bool:
@@ -206,7 +208,12 @@ def states_from_login_payload(payload: dict[str, Any]) -> dict[str, VanwardDevic
             device_type=product.get("Type") or device.get("catagoryName"),
         )
         try:
-            states[device_id] = state_from_status(status, info)
+            state = state_from_status(status, info)
+            # v3.2: 设备在线状态（isOnline，万和 App 离线显示同源）
+            # 老版本 payload 无此字段时保持默认 True（不误判离线）
+            if "isOnline" in device:
+                state.online = bool(device["isOnline"])
+            states[device_id] = state
         except ValueError as err:
             # 容错：字段数不够时不崩，打日志继续
             _LOGGER.error(

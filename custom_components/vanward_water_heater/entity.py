@@ -22,6 +22,21 @@ class VanwardEntity(CoordinatorEntity[VanwardCoordinator]):
         self._attr_translation_key = translation_key
 
     @property
+    def available(self) -> bool:
+        """Entity is available only if the device reported recently.
+
+        v3.2: WebSocket may stay connected to the cloud while the device
+        itself is offline (power cut / wifi lost). Treat entities as
+        unavailable after OFFLINE_TIMEOUT without a status report so HA
+        (and the HomeKit bridge) show "offline" instead of stale state.
+        """
+        if self.coordinator.data is None:
+            return False
+        return self.coordinator.client.is_device_online(
+            self.coordinator.device_id
+        )
+
+    @property
     def device_info(self) -> DeviceInfo:
         state = self.coordinator.data
         info = state.device_info

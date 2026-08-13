@@ -16,6 +16,7 @@ A Home Assistant custom integration for Vanward water heaters. The original plug
 - `water_heater.py`: exposes `current_temperature` for electric heaters
 - **4 new electric sensors**: current water temperature / target temperature / current mode / power status
 - **Feature bitmask**: flags like auto power-off are read/written bitwise with explanatory comments to avoid corrupting other bits
+- **Device offline detection (v3.2)**: parses the `isOnline` field from the login payload (same source as the Vanward app's "设备离线" badge); when the device goes offline, entities automatically become `unavailable` and both HA and the HomeKit bridge show offline instead of stale cached state. Payloads without `isOnline` default to online to avoid false negatives
 - Gas heater behavior is completely unchanged
 
 **Tested on**: Home Assistant 2026.7.4 + Vanward E60-Q2WY10-20 (60L electric heater). Integration loads cleanly, water temperature reads correctly, all 6 entities work.
@@ -76,6 +77,8 @@ After pairing via the HomeKit bridge (HASS Bridge), the heater appears as a **Wa
 ## Changelog
 
 ### 2026-08-13
+- **Added (v3.2)**: device offline detection — parses the `isOnline` flag from the login response (same source as the Vanward app's "设备离线" badge); entities automatically become `unavailable` when the device goes offline, so HA and the HomeKit bridge show offline instead of stale cached state. Payloads without the flag default to online to avoid false negatives
+- **Added (v3.2)**: 4 offline-detection test cases (online / offline / missing-flag compatibility / default), test suite 33 → 37
 - **Added (v3.1)**: electric mode code table (Normal/Medium/Anti-bacteria/Capacity-boost/ECO/e-push) with bidirectional read/write mapping; dual-track mode/temperature read-write (electric Status[4]/Status[6]); adaptive temperature range 35–75°C; feature bitmask read/write
 - **Added (v3.1)**: 4 electric sensors — current water temperature / target temperature / current mode / power status
 - **Fixed**: 3 CRITICAL + 3 MAJOR issues found in code review (mode read position, electric mode code table, ghost entity hiding, temperature range, e-push flag, missing tests)

@@ -246,3 +246,43 @@ class TestCloneAndUpdate:
         clone.operational_status[4] = 32
         assert state.operational_status[4] == 1  # 原对象不受影响
         assert clone.raw_status == state.raw_status
+
+
+# ───────────────────────── 设备在线状态（v3.2） ─────────────────────────
+
+class TestDeviceOnline:
+    def test_login_payload_online_flag(self):
+        # 登录 payload 带 isOnline=true
+        payload = {
+            "data": {"Devices": [
+                {"DeviceId": "dev1", "Status": ELECTRIC_STATUS_27,
+                 "isOnline": True, "Product": {}},
+            ]}
+        }
+        states = protocol.states_from_login_payload(payload)
+        assert states["dev1"].online is True
+
+    def test_login_payload_offline_flag(self):
+        # 设备离线：isOnline=false（万和 App 的"设备离线"同源）
+        payload = {
+            "data": {"Devices": [
+                {"DeviceId": "dev1", "Status": ELECTRIC_STATUS_27,
+                 "isOnline": False, "Product": {}},
+            ]}
+        }
+        states = protocol.states_from_login_payload(payload)
+        assert states["dev1"].online is False
+
+    def test_login_payload_missing_flag_defaults_online(self):
+        # 老版本 payload 无 isOnline 字段时默认为在线（不误判）
+        payload = {
+            "data": {"Devices": [
+                {"DeviceId": "dev1", "Status": ELECTRIC_STATUS_27, "Product": {}},
+            ]}
+        }
+        states = protocol.states_from_login_payload(payload)
+        assert states["dev1"].online is True
+
+    def test_state_from_status_keeps_default_online(self):
+        state = _electric_state()
+        assert state.online is True
