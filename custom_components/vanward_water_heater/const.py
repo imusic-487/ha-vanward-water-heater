@@ -66,6 +66,7 @@ ELECTRIC_MODE_MAP = {
 ELECTRIC_MODE_BY_NAME = {
     name: (mode, temperature, cruise_temperature)
     for mode, (name, temperature, cruise_temperature) in ELECTRIC_MODE_MAP.items()
+    if mode != 43  # 43 仅读值归一化（e-push+自动断电标志），写入必须用 35
 }
 
 # 电热机型水温范围（E60-Q2WY10-20 产品资料）
