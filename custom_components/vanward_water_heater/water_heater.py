@@ -46,7 +46,9 @@ class VanwardWaterHeater(VanwardEntity, WaterHeaterEntity):
     )
 
     def __init__(self, coordinator: VanwardCoordinator) -> None:
-        super().__init__(coordinator, "water_heater", "water_heater")
+        # v3.3.1: translation_key 置 None——主实体名直接继承设备名"热水器"，
+        # 避免 device_info.name + 实体翻译名拼接成"热水器 热水器"
+        super().__init__(coordinator, "water_heater", None)
 
     @property
     def min_temp(self) -> int:

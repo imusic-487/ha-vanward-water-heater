@@ -28,7 +28,9 @@ _LOGGER = logging.getLogger(__name__)
 class VanwardSensorDescription(SensorEntityDescription):
     """Description for Vanward sensor entities."""
 
-    value_fn: Callable[[VanwardDeviceState], float | str | None]
+    value_fn: Callable[[VanwardDeviceState], float | str | None] | None = None
+    # v3.3: 需要访问 api/coordinator 的传感器（如最后在线时间）
+    coord_fn: Callable[[VanwardCoordinator], float | str | None] | None = None
 
 
 # 燃气机型传感器（耗水耗气，原版保留）
@@ -93,6 +95,15 @@ ELECTRIC_SENSORS = [
         name="电源状态",
         value_fn=lambda state: "开" if state.power else "关",
     ),
+    # v3.3: 最后在线时间（wall-clock）——离线时帮判断"刚断还是断了一下午"
+    VanwardSensorDescription(
+        key="last_online",
+        name="最后在线时间",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        coord_fn=lambda coordinator: coordinator.client.last_online_at(
+            coordinator.device_id
+        ),
+    ),
 ]
 
 
@@ -130,4 +141,9 @@ class VanwardSensor(VanwardEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | str | None:
-        return self.entity_description.value_fn(self.coordinator.data)
+        desc = self.entity_description
+        if desc.coord_fn is not None:
+            return desc.coord_fn(self.coordinator)
+        if desc.value_fn is not None:
+            return desc.value_fn(self.coordinator.data)
+        return None

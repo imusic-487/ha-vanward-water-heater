@@ -43,7 +43,9 @@ class VanwardEntity(CoordinatorEntity[VanwardCoordinator]):
         return DeviceInfo(
             identifiers={(DOMAIN, info.device_id)},
             manufacturer="Vanward",
-            name=info.name or "万和热水器",
+            # v3.3: 设备名统一为"热水器"（家人看 HA 一眼就懂）；
+            # 型号仍保留在 model 字段，可在设备信息页查看
+            name="热水器",
             model=info.model,
             sw_version=info.series,
         )

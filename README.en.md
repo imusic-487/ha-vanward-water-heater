@@ -17,14 +17,32 @@ A Home Assistant custom integration for Vanward water heaters. The original plug
 - **4 new electric sensors**: current water temperature / target temperature / current mode / power status
 - **Feature bitmask**: flags like auto power-off are read/written bitwise with explanatory comments to avoid corrupting other bits
 - **Device offline detection (v3.2)**: parses the `isOnline` field from the login payload (same source as the Vanward app's "设备离线" badge); when the device goes offline, entities automatically become `unavailable` and both HA and the HomeKit bridge show offline instead of stale cached state. Payloads without `isOnline` default to online to avoid false negatives
+- **5-minute offline detection + last-online sensor (v3.3)**: offline detection defaults to 5 minutes (configurable) so a breaker trip surfaces quickly; new "last online" sensor shows when the device went offline
+- **Family-friendly naming (v3.3)**: device name unified to "热水器" (model stays in the device model field)
 - Gas heater behavior is completely unchanged
 
 **Tested on**: Home Assistant 2026.7.4 + Vanward E60-Q2WY10-20 (60L electric heater). Integration loads cleanly, water temperature reads correctly, all 6 entities work.
 
 **Known limitations**:
 - Only tested on E60-Q2WY10-20; other electric models (different capacities/newer revisions) are unverified
-- Gas-specific entities (current water usage / current gas usage / total gas usage / total water usage) are still registered on electric heaters but stay at 0.0
+- Electric heaters only register electric-related entities (water temp / target / mode / power / last online); gas-only entities (water usage, gas usage, etc.) are automatically skipped by device type
 - See upstream issue: [#1 Electric water heater (E60-Q2WY10-20) support proposal + patch](https://github.com/orangeboyChen/ha-vanward-water-heater/issues/1)
+
+## Offline troubleshooting (family-friendly)
+
+When entities show "unavailable", check in this order:
+
+1. **Check the bathroom outlet / breaker**: if the heater plugs into an outlet, check whether the residual-current (漏电保护) button on the plug has popped out; if wired to a breaker, check whether it tripped
+2. **Open the Vanward app**: if the device shows "设备离线" there too, it is a device/network issue, not this integration
+3. **Check WiFi**: router password changed? power outage? (device may need a few minutes to reconnect after router reboot)
+4. **Recovery**: after power is restored, HA re-syncs the real state within 5 minutes automatically — no manual step needed
+
+> Note: since v3.2, offline entities show "unavailable" instead of the last cached state. If you see "heating" but the device is actually powered off, check the "last online" sensor to see when it went offline.
+
+## Automation pitfalls
+
+- When the device loses power, its state goes from `on` to `unavailable`, then back to `on` when power is restored. If an automation triggers on "heater is on", filter out `unavailable` in its Condition (e.g. `{{ states('water_heater.xxx') != 'unavailable' }}`) to avoid false triggers during outages
+- Offline detection defaults to 5 minutes (`OFFLINE_TIMEOUT`, adjustable in `const.py`) — after a power cut, HA keeps showing the last state for up to 5 minutes, which is expected
 
 ## Installation
 
@@ -77,6 +95,7 @@ After pairing via the HomeKit bridge (HASS Bridge), the heater appears as a **Wa
 ## Changelog
 
 ### 2026-08-13
+- **Added (v3.3)**: offline detection defaults to 5 minutes (configurable) to avoid long stale "on" state after a breaker trip; new "last online" sensor; device name unified to "热水器" (family-friendly); README adds offline troubleshooting guide + automation pitfalls + fixes known-limitations section (ghost entities now filtered by device type)
 - **Added (v3.2)**: device offline detection — parses the `isOnline` flag from the login response (same source as the Vanward app's "设备离线" badge); entities automatically become `unavailable` when the device goes offline, so HA and the HomeKit bridge show offline instead of stale cached state. Payloads without the flag default to online to avoid false negatives
 - **Added (v3.2)**: 4 offline-detection test cases (online / offline / missing-flag compatibility / default), test suite 33 → 37
 - **Added (v3.1)**: electric mode code table (Normal/Medium/Anti-bacteria/Capacity-boost/ECO/e-push) with bidirectional read/write mapping; dual-track mode/temperature read-write (electric Status[4]/Status[6]); adaptive temperature range 35–75°C; feature bitmask read/write
